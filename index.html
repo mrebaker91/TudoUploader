@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Voice Note</title>
+</head>
+<body>
+  <h1>Tudo Voice Uploader</h1>
+
+  <form id="uploadForm">
+    <input type="email" id="email" placeholder="Enter your email" required><br><br>
+    <button type="button" id="recordButton">Record</button>
+    <button type="button" id="stopButton" disabled>Stop</button><br><br>
+    <button type="submit" disabled id="uploadButton">Upload</button>
+  </form>
+
+  <p id="status"></p>
+
+  <script>
+    let mediaRecorder;
+    let audioChunks;
+
+    const recordButton = document.getElementById('recordButton');
+    const stopButton = document.getElementById('stopButton');
+    const uploadButton = document.getElementById('uploadButton');
+    const status = document.getElementById('status');
+
+    recordButton.addEventListener('click', async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = event => {
+        audioChunks.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        uploadButton.disabled = false;
+      };
+
+      mediaRecorder.start();
+      recordButton.disabled = true;
+      stopButton.disabled = false;
+      status.textContent = "Recording...";
+    });
+
+    stopButton.addEventListener('click', () => {
+      mediaRecorder.stop();
+      recordButton.disabled = false;
+      stopButton.disabled = true;
+      status.textContent = "Recording stopped. Ready to upload.";
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value;
+      if (!email) {
+        alert("Please enter an email address!");
+        return;
+      }
+
+      const blob = new Blob(audioChunks, { type: 'audio/wav' });
+      const reader = new FileReader();
+
+      reader.onloadend = async () => {
+        const base64Audio = reader.result.split(',')[1];
+
+        await fetch('https://script.google.com/macros/s/AKfycbx-FKCr3ScS-kKQ8nIuIVRvR-mGe_5Cp7pvBNMTyOOD6iD8_jIbsw6Ho1j8Dp3UNIVq/exec', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `file=${encodeURIComponent(base64Audio)}&email=${encodeURIComponent(email)}`
+        })
+        .then(response => response.text())
+        .then(text => {
+          status.textContent = "Upload complete!";
+        })
+        .catch(error => {
+          status.textContent = "Upload failed.";
+        });
+      };
+
+      reader.readAsDataURL(blob);
+    });
+  </script>
+
+</body>
+</html>
