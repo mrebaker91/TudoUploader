@@ -3,6 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <title>Upload Voice Note</title>
+  <style>
+    #meter {
+      width: 300px;
+      height: 30px;
+      background-color: #ddd;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    #meter-fill {
+      height: 100%;
+      width: 0%;
+      background-color: #4caf50;
+      transition: width 0.1s;
+    }
+  </style>
 </head>
 <body>
   <h1>Tudo Voice Uploader</h1>
@@ -13,16 +29,26 @@
     <button type="button" id="stopButton" disabled>Stop</button><br><br>
   </form>
 
+  <div id="meter">
+    <div id="meter-fill"></div>
+  </div>
+
   <p id="status"></p>
 
   <script>
     let mediaRecorder;
     let audioChunks;
+    let audioContext;
+    let analyser;
+    let microphone;
+    let meterFill;
+    let animationId;
 
     const recordButton = document.getElementById('recordButton');
     const stopButton = document.getElementById('stopButton');
     const status = document.getElementById('status');
     const emailInput = document.getElementById('email');
+    meterFill = document.getElementById('meter-fill');
 
     // Load saved email if available
     window.addEventListener('load', () => {
@@ -34,6 +60,14 @@
 
     recordButton.addEventListener('click', async () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Setup Web Audio API for meter
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      microphone = audioContext.createMediaStreamSource(stream);
+      microphone.connect(analyser);
+      analyser.fftSize = 256;
+
       mediaRecorder = new MediaRecorder(stream);
       audioChunks = [];
 
@@ -44,6 +78,8 @@
       mediaRecorder.onstop = async () => {
         stopButton.disabled = true;
         recordButton.disabled = false;
+        cancelAnimationFrame(animationId);
+        audioContext.close();
         status.textContent = "Recording stopped. Uploading...";
 
         const email = emailInput.value;
@@ -85,9 +121,12 @@
       stopButton.disabled = false;
       status.textContent = "Recording...";
 
-      // Auto-stop after 2 minutes (120,000 ms)
+      // Animate the voice meter
+      animateMeter();
+
+      // Auto-stop after 2 minutes
       setTimeout(() => {
-        if (mediaRecorder.state === "recording") {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
           mediaRecorder.stop();
         }
       }, 120000);
@@ -98,6 +137,18 @@
         mediaRecorder.stop();
       }
     });
+
+    function animateMeter() {
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const draw = () => {
+        analyser.getByteFrequencyData(dataArray);
+        let volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        let percent = Math.min(100, (volume / 255) * 100);
+        meterFill.style.width = percent + "%";
+        animationId = requestAnimationFrame(draw);
+      };
+      draw();
+    }
   </script>
 
 </body>
