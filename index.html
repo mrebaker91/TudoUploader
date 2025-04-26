@@ -92,32 +92,24 @@
         localStorage.setItem('userEmail', email);
 
         const blob = new Blob(audioChunks, { type: 'audio/wav' });
-        const reader = new FileReader();
 
-        reader.onloadend = async () => {
-          const base64Audio = reader.result.split(',')[1];
+        const formData = new FormData();
+        formData.append('file', blob, 'voice.wav');
+        formData.append('email', email);
 
-          console.log("Base64 audio length:", base64Audio.length);
-
-          await fetch('https://script.google.com/macros/s/AKfycbx-FKCr3ScS-kKQ8nIuIVRvR-mGe_5Cp7pvBNMTyOOD6iD8_jIbsw6Ho1j8Dp3UNIVq/exec', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `file=${encodeURIComponent(base64Audio)}&email=${encodeURIComponent(email)}`
-          })
-          .then(response => response.text())
-          .then(text => {
-            console.log("Server response:", text); // ✅ LOGGING SERVER REPLY
-            status.textContent = "Upload complete!";
-          })
-          .catch(error => {
-            console.error("Upload error:", error); // ✅ LOGGING UPLOAD ERRORS
-            status.textContent = "Upload failed.";
-          });
-        };
-
-        reader.readAsDataURL(blob);
+        await fetch('https://script.google.com/macros/s/AKfycbx-FKCr3ScS-kKQ8nIuIVRvR-mGe_5Cp7pvBNMTyOOD6iD8_jIbsw6Ho1j8Dp3UNIVq/exec', {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => response.text())
+        .then(text => {
+          console.log("Server response:", text);
+          status.textContent = "Upload complete!";
+        })
+        .catch(error => {
+          console.error("Upload error:", error);
+          status.textContent = "Upload failed.";
+        });
       };
 
       mediaRecorder.start();
