@@ -50,7 +50,6 @@
     const emailInput = document.getElementById('email');
     meterFill = document.getElementById('meter-fill');
 
-    // Load saved email if available
     window.addEventListener('load', () => {
       const savedEmail = localStorage.getItem('userEmail');
       if (savedEmail) {
@@ -61,7 +60,6 @@
     recordButton.addEventListener('click', async () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // Setup Web Audio API for meter
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioContext.createAnalyser();
       microphone = audioContext.createMediaStreamSource(stream);
@@ -88,18 +86,16 @@
           return;
         }
 
-        // Save email locally
         localStorage.setItem('userEmail', email);
 
         const blob = new Blob(audioChunks, { type: 'audio/wav' });
 
-        const formData = new FormData();
-        formData.append('file', blob, 'voice.wav');
-        formData.append('email', email);
-
-        await fetch('https://script.google.com/macros/s/AKfycbx-FKCr3ScS-kKQ8nIuIVRvR-mGe_5Cp7pvBNMTyOOD6iD8_jIbsw6Ho1j8Dp3UNIVq/exec', {
+        await fetch('https://script.google.com/macros/s/AKfycbx-FKCr3ScS-kKQ8nIuIVRvR-mGe_5Cp7pvBNMTyOOD6iD8_jIbsw6Ho1j8Dp3UNIVq/exec?email=' + encodeURIComponent(email), {
           method: 'POST',
-          body: formData
+          headers: {
+            'Content-Type': 'audio/wav',
+          },
+          body: blob
         })
         .then(response => response.text())
         .then(text => {
@@ -117,15 +113,14 @@
       stopButton.disabled = false;
       status.textContent = "Recording...";
 
-      // Animate the voice meter
       animateMeter();
 
-      // Auto-stop after 2 minutes
+      // Auto-stop after 30 seconds
       setTimeout(() => {
         if (mediaRecorder && mediaRecorder.state === "recording") {
           mediaRecorder.stop();
         }
-      }, 120000);
+      }, 30000);
     });
 
     stopButton.addEventListener('click', () => {
