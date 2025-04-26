@@ -24,6 +24,15 @@
     const stopButton = document.getElementById('stopButton');
     const uploadButton = document.getElementById('uploadButton');
     const status = document.getElementById('status');
+    const emailInput = document.getElementById('email');
+
+    // Load saved email if available
+    window.addEventListener('load', () => {
+      const savedEmail = localStorage.getItem('userEmail');
+      if (savedEmail) {
+        emailInput.value = savedEmail;
+      }
+    });
 
     recordButton.addEventListener('click', async () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -42,6 +51,16 @@
       recordButton.disabled = true;
       stopButton.disabled = false;
       status.textContent = "Recording...";
+
+      // Auto-stop after 2 minutes (120,000 ms)
+      setTimeout(() => {
+        if (mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+          recordButton.disabled = false;
+          stopButton.disabled = true;
+          status.textContent = "Recording stopped (2 minute max reached). Ready to upload.";
+        }
+      }, 120000);
     });
 
     stopButton.addEventListener('click', () => {
@@ -54,11 +73,14 @@
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const email = document.getElementById('email').value;
+      const email = emailInput.value;
       if (!email) {
         alert("Please enter an email address!");
         return;
       }
+
+      // Save email locally
+      localStorage.setItem('userEmail', email);
 
       const blob = new Blob(audioChunks, { type: 'audio/wav' });
       const reader = new FileReader();
