@@ -4,20 +4,10 @@
   <meta charset="UTF-8">
   <title>Tudo Voice Uploader</title>
   <style>
-    #meter {
-      width: 300px;
-      height: 30px;
-      background-color: #ddd;
-      border-radius: 5px;
-      overflow: hidden;
-      margin-top: 20px;
-    }
-    #meter-fill {
-      height: 100%;
-      width: 0%;
-      background-color: #4caf50;
-      transition: width 0.1s;
-    }
+    body { background: #111; color: #eee; font-family: sans-serif; text-align: center; padding: 20px; }
+    #meter { width: 300px; height: 30px; background-color: #333; border-radius: 5px; overflow: hidden; margin: 20px auto; }
+    #meter-fill { height: 100%; width: 0%; background-color: #4caf50; transition: width 0.1s; }
+    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/jsrsasign"></script>
 </head>
@@ -83,8 +73,8 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDqbsrqkrWbYs7B
         audioContext.close();
         status.textContent = "Recording stopped. Uploading...";
 
-        const blob = new Blob(audioChunks, { type: 'audio/wav' });
-        await uploadFileToDrive(blob);
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        await uploadBlobToDrive(audioBlob);
       };
 
       mediaRecorder.start();
@@ -119,7 +109,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDqbsrqkrWbYs7B
       draw();
     }
 
-    async function uploadFileToDrive(blob) {
+    async function uploadBlobToDrive(blob) {
       try {
         const jwt = createJWT();
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -138,7 +128,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDqbsrqkrWbYs7B
 
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', blob);
+        form.append('file', blob, "voice_note.wav");  // <<< KEY CHANGE: name it explicitly!
 
         const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
           method: 'POST',
@@ -147,11 +137,11 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDqbsrqkrWbYs7B
         });
 
         const uploadJson = await uploadResponse.json();
-        status.textContent = 'Upload complete! File ID: ' + uploadJson.id;
-        console.log('File uploaded with ID:', uploadJson.id);
+        status.textContent = '✅ Upload complete! File ID: ' + uploadJson.id;
+        console.log('✅ File uploaded with ID:', uploadJson.id);
       } catch (error) {
         console.error(error);
-        status.textContent = 'Upload failed.';
+        status.textContent = '❌ Upload failed.';
       }
     }
 
