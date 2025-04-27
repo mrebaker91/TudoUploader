@@ -43,6 +43,7 @@ window.onload = function() {
   let meterFill;
   let animationId;
   let stream;
+  let userTimezone = "America/Detroit"; // default
 
   meterFill = document.getElementById('meter-fill');
   const recordButton = document.getElementById('recordButton');
@@ -52,7 +53,17 @@ window.onload = function() {
 
   const SERVER_UPLOAD_URL = "https://tudouploader.onrender.com/upload";
 
-  // Load saved email
+  // Try to detect timezone
+  try {
+    userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Detroit";
+    if (!userTimezone) {
+      userTimezone = "America/Detroit";
+    }
+  } catch (error) {
+    console.warn("Timezone detection failed, defaulting to America/Detroit");
+  }
+
+  // Load saved email if exists
   if (localStorage.getItem('savedEmail')) {
     emailInput.value = localStorage.getItem('savedEmail');
   }
@@ -96,7 +107,7 @@ window.onload = function() {
       status.classList.add('uploading');
 
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
-      await uploadBlob(blob, emailInput.value);
+      await uploadBlob(blob, emailInput.value, userTimezone);
     };
 
     mediaRecorder.start();
@@ -132,10 +143,12 @@ window.onload = function() {
     draw();
   }
 
-  async function uploadBlob(blob, email) {
+  async function uploadBlob(blob, email, timezone) {
     try {
+      const safeTimezone = timezone.replace(/\//g, "-"); // make safe for filename
+      const filename = `${email}__${safeTimezone}__${Date.now()}.webm`;
+
       const formData = new FormData();
-      const filename = `${email}_${Date.now()}.webm`;
       formData.append('file', blob, filename);
 
       const response = await fetch(SERVER_UPLOAD_URL, {
