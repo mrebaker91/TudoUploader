@@ -16,9 +16,11 @@
       100% { opacity: 1; }
     }
   </style>
-  <!-- Correct jsrsasign version for browsers -->
+
+  <!-- Correct jsrsasign version -->
   <script src="https://cdn.jsdelivr.net/npm/jsrsasign@8.0.24/jsrsasign-all-min.js"></script>
 </head>
+
 <body>
   <h1>Tudo Voice Uploader</h1>
 
@@ -33,145 +35,148 @@
 
   <p id="status"></p>
 
-  <script>
-    let mediaRecorder;
-    let audioChunks;
-    let audioContext;
-    let analyser;
-    let microphone;
-    let meterFill;
-    let animationId;
+<script>
+window.onload = function() {
+  let mediaRecorder;
+  let audioChunks;
+  let audioContext;
+  let analyser;
+  let microphone;
+  let meterFill;
+  let animationId;
 
-    meterFill = document.getElementById('meter-fill');
-    const recordButton = document.getElementById('recordButton');
-    const stopButton = document.getElementById('stopButton');
-    const status = document.getElementById('status');
+  meterFill = document.getElementById('meter-fill');
+  const recordButton = document.getElementById('recordButton');
+  const stopButton = document.getElementById('stopButton');
+  const status = document.getElementById('status');
 
-    const FOLDER_ID = '1tvoQALyZeQ1Db_QwPHysY0x5xQQDSOAM'; // Your Tudo Google Drive Folder ID
+  const FOLDER_ID = '1tvoQALyZeQ1Db_QwPHysY0x5xQQDSOAM'; // Your Tudo Drive Folder ID
 
-    const SERVICE_ACCOUNT = {
-      private_key: `-----BEGIN PRIVATE KEY-----
+  const SERVICE_ACCOUNT = {
+    private_key: `-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDqbsrqkrWbYs7B
 ...
 +Sl4Yqngrg6FBjREC4VyM98=
 -----END PRIVATE KEY-----`,
-      client_email: "googledriveuploader@voicerecorder-456703.iam.gserviceaccount.com"
+    client_email: "googledriveuploader@voicerecorder-456703.iam.gserviceaccount.com"
+  };
+
+  recordButton.addEventListener('click', async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    microphone = audioContext.createMediaStreamSource(stream);
+    microphone.connect(analyser);
+    analyser.fftSize = 256;
+
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = event => {
+      audioChunks.push(event.data);
     };
 
-    recordButton.addEventListener('click', async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder.onstop = async () => {
+      stopButton.disabled = true;
+      recordButton.disabled = false;
+      cancelAnimationFrame(animationId);
+      audioContext.close();
+      status.textContent = "Uploading...";
+      status.classList.add('uploading');
 
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioContext.createAnalyser();
-      microphone = audioContext.createMediaStreamSource(stream);
-      microphone.connect(analyser);
-      analyser.fftSize = 256;
+      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+      await uploadBlobToDrive(audioBlob);
+    };
 
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
+    mediaRecorder.start();
+    recordButton.disabled = true;
+    stopButton.disabled = false;
+    status.textContent = "Recording...";
 
-      mediaRecorder.ondataavailable = event => {
-        audioChunks.push(event.data);
-      };
+    animateMeter();
 
-      mediaRecorder.onstop = async () => {
-        stopButton.disabled = true;
-        recordButton.disabled = false;
-        cancelAnimationFrame(animationId);
-        audioContext.close();
-        status.textContent = "Recording stopped. Uploading...";
-        status.classList.add('uploading');
-
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-        await uploadBlobToDrive(audioBlob);
-      };
-
-      mediaRecorder.start();
-      recordButton.disabled = true;
-      stopButton.disabled = false;
-      status.textContent = "Recording...";
-
-      animateMeter();
-
-      setTimeout(() => {
-        if (mediaRecorder && mediaRecorder.state === "recording") {
-          mediaRecorder.stop();
-        }
-      }, 30000); // Auto stop at 30 seconds
-    });
-
-    stopButton.addEventListener('click', () => {
+    setTimeout(() => {
       if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
       }
-    });
+    }, 30000); // Auto stop at 30 seconds
+  });
 
-    function animateMeter() {
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const draw = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
-        let percent = Math.min(100, (volume / 255) * 100);
-        meterFill.style.width = percent + "%";
-        animationId = requestAnimationFrame(draw);
-      };
-      draw();
+  stopButton.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      mediaRecorder.stop();
     }
+  });
 
-    async function uploadBlobToDrive(blob) {
-      try {
-        const jwt = createJWT();
-        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
-        });
+  function animateMeter() {
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const draw = () => {
+      analyser.getByteFrequencyData(dataArray);
+      let volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      let percent = Math.min(100, (volume / 255) * 100);
+      meterFill.style.width = percent + "%";
+      animationId = requestAnimationFrame(draw);
+    };
+    draw();
+  }
 
-        const tokenJson = await tokenResponse.json();
-        const accessToken = tokenJson.access_token;
+  async function uploadBlobToDrive(blob) {
+    try {
+      const jwt = createJWT();
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+      });
 
-        const metadata = {
-          name: `voice_note_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.wav`,
-          parents: [FOLDER_ID]
-        };
+      const tokenJson = await tokenResponse.json();
+      const accessToken = tokenJson.access_token;
 
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', blob, "voice_note.wav");
-
-        const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + accessToken },
-          body: form
-        });
-
-        const uploadJson = await uploadResponse.json();
-        status.textContent = '✅ Upload complete! File ID: ' + uploadJson.id;
-        status.classList.remove('uploading');
-        console.log('✅ File uploaded with ID:', uploadJson.id);
-      } catch (error) {
-        console.error(error);
-        status.textContent = '❌ Upload failed.';
-        status.classList.remove('uploading');
-      }
-    }
-
-    function createJWT() {
-      const header = { alg: 'RS256', typ: 'JWT' };
-      const now = Math.floor(Date.now() / 1000);
-      const claim = {
-        iss: SERVICE_ACCOUNT.client_email,
-        scope: 'https://www.googleapis.com/auth/drive.file',
-        aud: 'https://oauth2.googleapis.com/token',
-        exp: now + 3600,
-        iat: now
+      const metadata = {
+        name: `voice_note_${new Date().toISOString().slice(0,19).replace(/:/g,"-")}.wav`,
+        parents: [FOLDER_ID]
       };
 
-      const sHeader = JSON.stringify(header);
-      const sClaim = JSON.stringify(claim);
-      const key = KEYUTIL.getKey(SERVICE_ACCOUNT.private_key);
-      return KJUR.jws.JWS.sign("RS256", sHeader, sClaim, key);
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', blob, "voice_note.wav");
+
+      const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + accessToken },
+        body: form
+      });
+
+      const uploadJson = await uploadResponse.json();
+      status.textContent = '✅ Upload complete! File ID: ' + uploadJson.id;
+      status.classList.remove('uploading');
+      console.log('✅ File uploaded with ID:', uploadJson.id);
+    } catch (error) {
+      console.error(error);
+      status.textContent = '❌ Upload failed.';
+      status.classList.remove('uploading');
     }
-  </script>
+  }
+
+  function createJWT() {
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const now = Math.floor(Date.now() / 1000);
+    const claim = {
+      iss: SERVICE_ACCOUNT.client_email,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: now + 3600,
+      iat: now
+    };
+
+    const sHeader = JSON.stringify(header);
+    const sClaim = JSON.stringify(claim);
+    const key = KEYUTIL.getKey(SERVICE_ACCOUNT.private_key);
+    return KJUR.jws.JWS.sign("RS256", sHeader, sClaim, key);
+  }
+
+}
+</script>
 </body>
 </html>
