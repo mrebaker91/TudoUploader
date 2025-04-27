@@ -5,7 +5,7 @@ const path = require('path');
 
 const app = express();
 
-// Your secret token (replace 'your_secret_here' with your Render env var if needed)
+// Your secret token (replace 'your_secret_here' later with your Render env var)
 const AUTH_TOKEN = process.env.AUTH_TOKEN || 'your_secret_here';
 
 // Create uploads folder if it doesn't exist
@@ -29,7 +29,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
   res.status(200).send('✅ Upload successful!');
 });
 
-// Secure list uploads endpoint (only lists .webm files)
+// Secure list uploads endpoint (list ALL files)
 app.get('/list_uploads', (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || authHeader !== `Bearer ${AUTH_TOKEN}`) {
@@ -42,8 +42,7 @@ app.get('/list_uploads', (req, res) => {
       console.error('Error reading uploads:', err);
       return res.status(500).send('Server error');
     }
-    const uploadedFiles = files.filter(file => file.endsWith('.webm'));
-    res.json(uploadedFiles);
+    res.json(files); // ✅ List ALL files, no filtering
   });
 });
 
@@ -58,7 +57,7 @@ app.use('/uploads', (req, res, next) => {
   express.static('uploads')(req, res, next);
 });
 
-// New: Secure delete endpoint for unwanted files
+// Secure delete endpoint for unwanted files
 app.delete('/uploads/:filename', (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || authHeader !== `Bearer ${AUTH_TOKEN}`) {
