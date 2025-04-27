@@ -6,8 +6,7 @@
   <style>
     body { background: #111; color: #eee; font-family: sans-serif; text-align: center; padding: 20px; }
     #meter { width: 300px; height: 30px; background-color: #333; border-radius: 5px; overflow: hidden; margin: 20px auto; }
-    #meter-fill { height: 100%; width: 0%; background-color: #4caf50; transition: width 0.1s; }
-    input, select, button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+    input, button { margin: 10px; padding: 10px 20px; font-size: 16px; }
     #status { margin-top: 20px; font-size: 18px; }
     .uploading { animation: blink 1s infinite; }
     @keyframes blink {
@@ -23,15 +22,6 @@
 
   <form id="uploadForm">
     <input type="email" id="emailInput" placeholder="Enter your email" required><br>
-    
-    <label for="timezone">Select Timezone:</label>
-    <select id="timezone" required>
-      <option value="America/Detroit">Eastern (US)</option>
-      <option value="America/Chicago">Central (US)</option>
-      <option value="America/Denver">Mountain (US)</option>
-      <option value="America/Los_Angeles">Pacific (US)</option>
-      <option value="UTC">UTC (Universal)</option>
-    </select><br>
 
     <button type="button" id="recordButton">Record</button>
     <button type="button" id="stopButton" disabled>Stop</button><br><br>
@@ -58,38 +48,27 @@ window.onload = function() {
   const stopButton = document.getElementById('stopButton');
   const status = document.getElementById('status');
   const emailInput = document.getElementById('emailInput');
-  const timezoneSelect = document.getElementById('timezone');
 
-  // Restore saved email and timezone
+  // Restore saved email
   const savedEmail = localStorage.getItem('savedEmail');
   if (savedEmail) {
     emailInput.value = savedEmail;
   }
 
-  const savedTimezone = localStorage.getItem('savedTimezone');
-  if (savedTimezone) {
-    timezoneSelect.value = savedTimezone;
-  }
+  // Detect timezone automatically
+  const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  localStorage.setItem('savedTimezone', detectedTimezone);
 
-  // Save when changed
   emailInput.addEventListener('input', () => {
     localStorage.setItem('savedEmail', emailInput.value);
-  });
-  timezoneSelect.addEventListener('change', () => {
-    localStorage.setItem('savedTimezone', timezoneSelect.value);
   });
 
   recordButton.addEventListener('click', async () => {
     const email = emailInput.value.trim();
-    const timezone = timezoneSelect.value;
+    const timezone = localStorage.getItem('savedTimezone') || "UTC";
 
     if (!validateEmail(email)) {
       status.textContent = "❌ Please enter a valid email.";
-      return;
-    }
-
-    if (!timezone) {
-      status.textContent = "❌ Please select a timezone.";
       return;
     }
 
@@ -152,7 +131,7 @@ window.onload = function() {
       if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
       }
-    }, 30000); // Auto stop after 30s
+    }, 30000); // Auto stop after 30 seconds
   });
 
   stopButton.addEventListener('click', () => {
