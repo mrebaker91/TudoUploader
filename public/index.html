@@ -125,13 +125,7 @@ window.onload = function() {
     stopButton.disabled = false;
     status.textContent = "Recording...";
 
-    animateMeter();
-
-    setTimeout(() => {
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-      }
-    }, 30000); // Auto stop after 30 seconds
+    animateMeter(); // 🎯 Correct: start animating AFTER mediaRecorder.start
   });
 
   stopButton.addEventListener('click', () => {
