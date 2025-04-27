@@ -24,6 +24,25 @@ app.post('/upload', upload.single('file'), (req, res) => {
   res.status(200).send('✅ Upload successful!');
 });
 
+// Secure list uploads endpoint (NEW)
+app.get('/list_uploads', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || authHeader !== `Bearer ${AUTH_TOKEN}`) {
+    console.warn('🚫 Unauthorized attempt to list uploads!');
+    return res.status(403).send('Forbidden');
+  }
+
+  fs.readdir('uploads', (err, files) => {
+    if (err) {
+      console.error('Error reading uploads:', err);
+      return res.status(500).send('Server error');
+    }
+    // Only return files ending in .oga
+    const ogaFiles = files.filter(file => file.endsWith('.oga'));
+    res.json(ogaFiles);
+  });
+});
+
 // Protected file download endpoint
 app.use('/uploads', (req, res, next) => {
   const authHeader = req.headers.authorization;
