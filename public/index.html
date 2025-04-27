@@ -7,7 +7,7 @@
     body { background: #111; color: #eee; font-family: sans-serif; text-align: center; padding: 20px; }
     #meter { width: 300px; height: 30px; background-color: #333; border-radius: 5px; overflow: hidden; margin: 20px auto; }
     #meter-fill { height: 100%; width: 0%; background-color: #4caf50; transition: width 0.1s; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+    input, button { margin: 10px; padding: 10px 20px; font-size: 16px; }
     #status { margin-top: 20px; font-size: 18px; }
     .uploading { animation: blink 1s infinite; }
     @keyframes blink {
@@ -22,6 +22,7 @@
   <h1>Tudo Voice Uploader</h1>
 
   <form id="uploadForm">
+    <input type="email" id="emailInput" placeholder="Enter your email" required><br>
     <button type="button" id="recordButton">Record</button>
     <button type="button" id="stopButton" disabled>Stop</button><br><br>
   </form>
@@ -46,8 +47,16 @@ window.onload = function() {
   const recordButton = document.getElementById('recordButton');
   const stopButton = document.getElementById('stopButton');
   const status = document.getElementById('status');
+  const emailInput = document.getElementById('emailInput');
 
   recordButton.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+
+    if (!validateEmail(email)) {
+      status.textContent = "❌ Please enter a valid email.";
+      return;
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -72,7 +81,7 @@ window.onload = function() {
       status.classList.add('uploading');
 
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      await uploadBlobToServer(audioBlob);
+      await uploadBlobToServer(audioBlob, email);
     };
 
     mediaRecorder.start();
@@ -107,10 +116,14 @@ window.onload = function() {
     draw();
   }
 
-  async function uploadBlobToServer(blob) {
+  async function uploadBlobToServer(blob, email) {
     try {
+      const safeEmail = email.replace(/[^a-zA-Z0-9@.]/g, "_");
+      const timestamp = Date.now();
+      const filename = `${safeEmail}_${timestamp}.webm`;
+
       const formData = new FormData();
-      formData.append('file', blob, `voice_note_${Date.now()}.webm`);
+      formData.append('file', blob, filename);
 
       const uploadResponse = await fetch('/upload', {
         method: 'POST',
@@ -131,6 +144,11 @@ window.onload = function() {
       status.textContent = '❌ Upload failed.';
       status.classList.remove('uploading');
     }
+  }
+
+  function validateEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
   }
 }
 </script>
