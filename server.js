@@ -5,7 +5,7 @@ const path = require('path');
 
 const app = express();
 
-// Your secret token (replace 'your_secret_here' later with your Render env var)
+// Your secret token (replace 'your_secret_here' with your Render env var)
 const AUTH_TOKEN = process.env.AUTH_TOKEN || 'your_secret_here';
 
 // Create uploads folder if it doesn't exist
@@ -13,8 +13,17 @@ if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
 
-// Multer setup to accept file uploads
-const upload = multer({ dest: 'uploads/' });
+// Multer setup to accept original filenames
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.originalname);
+  }
+});
+
+const upload = multer({ storage: storage });
 
 // --- ROUTES ---
 
@@ -42,7 +51,7 @@ app.get('/list_uploads', (req, res) => {
       console.error('Error reading uploads:', err);
       return res.status(500).send('Server error');
     }
-    res.json(files); // ✅ List ALL files, no filtering
+    res.json(files);
   });
 });
 
