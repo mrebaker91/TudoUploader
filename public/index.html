@@ -7,7 +7,7 @@
     body { background: #111; color: #eee; font-family: sans-serif; text-align: center; padding: 20px; }
     #meter { width: 300px; height: 30px; background-color: #333; border-radius: 5px; overflow: hidden; margin: 20px auto; }
     #meter-fill { height: 100%; width: 0%; background-color: #4caf50; transition: width 0.1s; }
-    input, button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+    input, select, button { margin: 10px; padding: 10px 20px; font-size: 16px; }
     #status { margin-top: 20px; font-size: 18px; }
     .uploading { animation: blink 1s infinite; }
     @keyframes blink {
@@ -23,6 +23,16 @@
 
   <form id="uploadForm">
     <input type="email" id="emailInput" placeholder="Enter your email" required><br>
+    
+    <label for="timezone">Select Timezone:</label>
+    <select id="timezone" required>
+      <option value="America/Detroit">Eastern (US)</option>
+      <option value="America/Chicago">Central (US)</option>
+      <option value="America/Denver">Mountain (US)</option>
+      <option value="America/Los_Angeles">Pacific (US)</option>
+      <option value="UTC">UTC (Universal)</option>
+    </select><br>
+
     <button type="button" id="recordButton">Record</button>
     <button type="button" id="stopButton" disabled>Stop</button><br><br>
   </form>
@@ -48,12 +58,38 @@ window.onload = function() {
   const stopButton = document.getElementById('stopButton');
   const status = document.getElementById('status');
   const emailInput = document.getElementById('emailInput');
+  const timezoneSelect = document.getElementById('timezone');
+
+  // Restore saved email and timezone
+  const savedEmail = localStorage.getItem('savedEmail');
+  if (savedEmail) {
+    emailInput.value = savedEmail;
+  }
+
+  const savedTimezone = localStorage.getItem('savedTimezone');
+  if (savedTimezone) {
+    timezoneSelect.value = savedTimezone;
+  }
+
+  // Save when changed
+  emailInput.addEventListener('input', () => {
+    localStorage.setItem('savedEmail', emailInput.value);
+  });
+  timezoneSelect.addEventListener('change', () => {
+    localStorage.setItem('savedTimezone', timezoneSelect.value);
+  });
 
   recordButton.addEventListener('click', async () => {
     const email = emailInput.value.trim();
+    const timezone = timezoneSelect.value;
 
     if (!validateEmail(email)) {
       status.textContent = "❌ Please enter a valid email.";
+      return;
+    }
+
+    if (!timezone) {
+      status.textContent = "❌ Please select a timezone.";
       return;
     }
 
@@ -81,7 +117,28 @@ window.onload = function() {
       status.classList.add('uploading');
 
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      await uploadBlobToServer(audioBlob, email);
+      const safeEmail = email.replace(/[^a-zA-Z0-9@.]/g, "_");
+      const safeTimezone = timezone.replace(/[^a-zA-Z0-9/]/g, "_");
+      const timestamp = Date.now();
+      const filename = `${safeEmail}__${safeTimezone}__${timestamp}.webm`;
+
+      const formData = new FormData();
+      formData.append('file', audioBlob, filename);
+
+      const uploadResponse = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (uploadResponse.ok) {
+        status.textContent = '✅ Upload complete!';
+        status.classList.remove('uploading');
+        console.log('✅ File uploaded successfully!');
+      } else {
+        status.textContent = '❌ Upload failed.';
+        status.classList.remove('uploading');
+        console.error('❌ Upload failed with status:', uploadResponse.status);
+      }
     };
 
     mediaRecorder.start();
@@ -95,7 +152,7 @@ window.onload = function() {
       if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
       }
-    }, 30000); // Auto stop at 30 seconds
+    }, 30000); // Auto stop after 30s
   });
 
   stopButton.addEventListener('click', () => {
@@ -114,36 +171,6 @@ window.onload = function() {
       animationId = requestAnimationFrame(draw);
     };
     draw();
-  }
-
-  async function uploadBlobToServer(blob, email) {
-    try {
-      const safeEmail = email.replace(/[^a-zA-Z0-9@.]/g, "_");
-      const timestamp = Date.now();
-      const filename = `${safeEmail}_${timestamp}.webm`;
-
-      const formData = new FormData();
-      formData.append('file', blob, filename);
-
-      const uploadResponse = await fetch('/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (uploadResponse.ok) {
-        status.textContent = '✅ Upload complete!';
-        status.classList.remove('uploading');
-        console.log('✅ File uploaded successfully!');
-      } else {
-        status.textContent = '❌ Upload failed.';
-        status.classList.remove('uploading');
-        console.error('❌ Upload failed with status:', uploadResponse.status);
-      }
-    } catch (error) {
-      console.error(error);
-      status.textContent = '❌ Upload failed.';
-      status.classList.remove('uploading');
-    }
   }
 
   function validateEmail(email) {
