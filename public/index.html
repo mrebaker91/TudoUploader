@@ -56,7 +56,7 @@ window.onload = function() {
     microphone.connect(analyser);
     analyser.fftSize = 256;
 
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
     audioChunks = [];
 
     mediaRecorder.ondataavailable = event => {
