@@ -20,11 +20,16 @@ const upload = multer({ dest: 'uploads/' });
 
 // Public upload endpoint (no auth needed)
 app.post('/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    console.warn('🚫 No file uploaded!');
+    return res.status(400).send('No file uploaded.');
+  }
+
   console.log('✅ File uploaded:', req.file.originalname);
   res.status(200).send('✅ Upload successful!');
 });
 
-// Secure list uploads endpoint (NEW)
+// Secure list uploads endpoint (only lists .webm files)
 app.get('/list_uploads', (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || authHeader !== `Bearer ${AUTH_TOKEN}`) {
@@ -37,9 +42,8 @@ app.get('/list_uploads', (req, res) => {
       console.error('Error reading uploads:', err);
       return res.status(500).send('Server error');
     }
-    // Only return files ending in .oga
-    const ogaFiles = files.filter(file => file.endsWith('.oga'));
-    res.json(ogaFiles);
+    const uploadedFiles = files.filter(file => file.endsWith('.webm'));
+    res.json(uploadedFiles);
   });
 });
 
@@ -51,7 +55,6 @@ app.use('/uploads', (req, res, next) => {
     return res.status(403).send('Forbidden');
   }
 
-  // If token is valid, serve static files
   express.static('uploads')(req, res, next);
 });
 
