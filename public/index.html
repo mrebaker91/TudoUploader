@@ -6,7 +6,8 @@
   <style>
     body { background: #111; color: #eee; font-family: sans-serif; text-align: center; padding: 20px; }
     #meter { width: 300px; height: 30px; background-color: #333; border-radius: 5px; overflow: hidden; margin: 20px auto; }
-    input, button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+    #meter-fill { height: 100%; width: 0%; background-color: #4caf50; transition: width 0.1s; }
+    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
     #status { margin-top: 20px; font-size: 18px; }
     .uploading { animation: blink 1s infinite; }
     @keyframes blink {
@@ -21,8 +22,7 @@
   <h1>Tudo Voice Uploader</h1>
 
   <form id="uploadForm">
-    <input type="email" id="emailInput" placeholder="Enter your email" required><br>
-
+    <input type="email" id="emailInput" placeholder="Enter your email" required style="padding:8px; font-size:16px; width:250px;"><br><br>
     <button type="button" id="recordButton">Record</button>
     <button type="button" id="stopButton" disabled>Stop</button><br><br>
   </form>
@@ -42,6 +42,7 @@ window.onload = function() {
   let microphone;
   let meterFill;
   let animationId;
+  let stream;
 
   meterFill = document.getElementById('meter-fill');
   const recordButton = document.getElementById('recordButton');
@@ -49,38 +50,31 @@ window.onload = function() {
   const status = document.getElementById('status');
   const emailInput = document.getElementById('emailInput');
 
-  // Restore saved email
-  const savedEmail = localStorage.getItem('savedEmail');
-  if (savedEmail) {
-    emailInput.value = savedEmail;
+  const SERVER_UPLOAD_URL = "https://tudouploader.onrender.com/upload";
+
+  // Load saved email
+  if (localStorage.getItem('savedEmail')) {
+    emailInput.value = localStorage.getItem('savedEmail');
   }
 
-  // Detect timezone automatically
-  const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  localStorage.setItem('savedTimezone', detectedTimezone);
-
-  emailInput.addEventListener('input', () => {
-    localStorage.setItem('savedEmail', emailInput.value);
-  });
-
   recordButton.addEventListener('click', async () => {
-    const email = emailInput.value.trim();
-    const timezone = localStorage.getItem('savedTimezone') || "UTC";
-
-    if (!validateEmail(email)) {
-      status.textContent = "❌ Please enter a valid email.";
+    if (!emailInput.value || !emailInput.value.includes('@')) {
+      alert('Please enter a valid email address first.');
       return;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStorage.setItem('savedEmail', emailInput.value);
 
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    await audioContext.resume();
+
     analyser = audioContext.createAnalyser();
     microphone = audioContext.createMediaStreamSource(stream);
     microphone.connect(analyser);
     analyser.fftSize = 256;
 
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
     audioChunks = [];
 
     mediaRecorder.ondataavailable = event => {
@@ -91,33 +85,18 @@ window.onload = function() {
       stopButton.disabled = true;
       recordButton.disabled = false;
       cancelAnimationFrame(animationId);
-      audioContext.close();
+      if (audioContext) {
+        audioContext.close();
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
       status.textContent = "Uploading...";
       status.classList.add('uploading');
 
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      const safeEmail = email.replace(/[^a-zA-Z0-9@.]/g, "_");
-      const safeTimezone = timezone.replace(/[^a-zA-Z0-9/]/g, "_");
-      const timestamp = Date.now();
-      const filename = `${safeEmail}__${safeTimezone}__${timestamp}.webm`;
-
-      const formData = new FormData();
-      formData.append('file', audioBlob, filename);
-
-      const uploadResponse = await fetch('/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (uploadResponse.ok) {
-        status.textContent = '✅ Upload complete!';
-        status.classList.remove('uploading');
-        console.log('✅ File uploaded successfully!');
-      } else {
-        status.textContent = '❌ Upload failed.';
-        status.classList.remove('uploading');
-        console.error('❌ Upload failed with status:', uploadResponse.status);
-      }
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      await uploadBlob(blob, emailInput.value);
     };
 
     mediaRecorder.start();
@@ -125,7 +104,13 @@ window.onload = function() {
     stopButton.disabled = false;
     status.textContent = "Recording...";
 
-    animateMeter(); // 🎯 Correct: start animating AFTER mediaRecorder.start
+    animateMeter();
+
+    setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+      }
+    }, 30000); // auto stop at 30s
   });
 
   stopButton.addEventListener('click', () => {
@@ -136,9 +121,10 @@ window.onload = function() {
 
   function animateMeter() {
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
     const draw = () => {
       analyser.getByteFrequencyData(dataArray);
-      let volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      let volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
       let percent = Math.min(100, (volume / 255) * 100);
       meterFill.style.width = percent + "%";
       animationId = requestAnimationFrame(draw);
@@ -146,11 +132,31 @@ window.onload = function() {
     draw();
   }
 
-  function validateEmail(email) {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
+  async function uploadBlob(blob, email) {
+    try {
+      const formData = new FormData();
+      const filename = `${email}_${Date.now()}.webm`;
+      formData.append('file', blob, filename);
+
+      const response = await fetch(SERVER_UPLOAD_URL, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        status.textContent = "✅ Upload complete!";
+      } else {
+        status.textContent = "❌ Upload failed.";
+      }
+      status.classList.remove('uploading');
+    } catch (error) {
+      console.error(error);
+      status.textContent = "❌ Upload error.";
+      status.classList.remove('uploading');
+    }
   }
 }
 </script>
+
 </body>
 </html>
