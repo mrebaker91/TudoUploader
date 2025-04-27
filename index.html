@@ -2,152 +2,115 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Upload Voice Note</title>
-  <style>
-    #meter {
-      width: 300px;
-      height: 30px;
-      background-color: #ddd;
-      border-radius: 5px;
-      overflow: hidden;
-      margin-top: 20px;
-    }
-    #meter-fill {
-      height: 100%;
-      width: 0%;
-      background-color: #4caf50;
-      transition: width 0.1s;
-    }
-  </style>
+  <title>Google Drive Uploader</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsrsasign"></script> <!-- brings in signing library -->
 </head>
 <body>
-  <h1>Tudo Voice Uploader</h1>
+  <h1>Upload to Google Drive</h1>
 
-  <form id="uploadForm">
-    <input type="email" id="email" placeholder="Enter your email" required><br><br>
-    <button type="button" id="recordButton">Record</button>
-    <button type="button" id="stopButton" disabled>Stop</button><br><br>
-  </form>
+  <input type="file" id="fileInput">
+  <button onclick="uploadFile()">Upload</button>
 
-  <div id="meter">
-    <div id="meter-fill"></div>
-  </div>
-
-  <p id="status"></p>
+  <pre id="output"></pre>
 
   <script>
-    let mediaRecorder;
-    let audioChunks;
-    let audioContext;
-    let analyser;
-    let microphone;
-    let meterFill;
-    let animationId;
+    // Your service account credentials
+    const SERVICE_ACCOUNT = {
+      private_key: `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDqbsrqkrWbYs7B
+hbNWirJlQpCui+FMLxFI+cB0+xP6ZrnU3ylzWRyrzlMPMUu+HsXaUsfeLNr+wZYp
+FnSDHC3jyg0i+FOd7RtCp5B/BNZo65UdusKdrlMqIaAGzFhcudmbw+9W1WYi72/c
+IuVfdeiWpiRqUml26cugk1BOGoGP/N12EbADMLf3xKHjn/AWIjG0DKz9QExVuPk1
+bUCXIiiIiwzr3OwP3r/txzWEexpSSvpOV138IBKvyjaCRJNsz/ak1EsXpq3nuTUn
+W0lH2z7A+eOefXScdGgec9DCggU29GGCTGwkbbjPMpOMpGt1JHXED7wR5amhPu3U
+ZKm2rzpJAgMBAAECggEAMGeNasc9i7aoWaFtUNhk8s7+eCfGLliGkWKOGClSa/Cj
+fJ5SXPCAoMHCeR/U043fjM9sWMW6twDKLDQofPzHxeGNelO7Uh+nsgjOp0dcrP+9
+g4yxC+U3Yzrbo6O0N/sgwQ6A/9UimGKHXnTvFtmN23M1ECXxhD3MT1yzZ1kGOPAY
+G5I7j4Tb1ie3bPyDAQRNxpB9hL76i/OvWyI63GoaMbx+6RC+6Kt8jiFP1E7b6vx7
+w+rKZ2b9eq4zV+pZnd2FdbdBBfg8L9aYOthfvrdpKYifRuAWzQ7GGtJFrXsILdoO
+p9p4Fo1ErJDJpE0qb8GRObaJ40lm++bAUs4lpbyA/QKBgQD/C/28SRvkwFXjEp7d
+GkYNnO3iGPqXSqJUKvFDihwnakINDqiDwgiFEmHcV7EFvX2pVdlPSDHRAtJ5vt0w
+3KFzw4k98KadYG7lyPK60yXb+ZPY48LdytLm5Uo7cpVGRuKHyxZj7PckoS31rNHr
+jbtu3a9HJy/L1RZXqeoZDYFCvQKBgQDrTxRe2RN4a/t84IJSElfrQwBZ5Ytrw5FJ
+jMieKtNR2efNlRWlgI3zznaA4LlfATTrJNYUOTCNyAvN/u6PxQERUnpzqZ4xDrGi
+/omAU6obprdfC1o6s7qUALd+1RB0x5H9ZciaosCnkJuNxK2K6UdEbUsoRtVI7Byz
+l7DgTOR0fQKBgEUAtoZxdTV/f/0udYK2cAuQ0J9iSLIUBDUnZRzzycg0LGih9Z+o
+KGvwXD+kDgXSjaP50RBtJOU6kT1VETz+BERwu7nhWQKtK3PJ2ToIlG6eaIy+mmMt
+U8Aaeun4h0B7PyCkJoukef0UCn40YpsLPpGxMpHanUjVfvT6yJY8nCM1AoGBAJ/s
+Xf7cb9QvJ3vGpiubVe+J2OpADNKP1uVy7kI4/ugpPdbGFTEnPtLNplKO6M1953ZM
+0cZq2+nwZL17Hq3NiZ05Pgnv5JiY0PfjIJZ7xigG1aed8pPk5NCD8DIeIpILtNfQ
+Xldid6cqq93dJsk7JHmIAkV8Zqap+hPA67B18eqNAoGAcYUZsIWdhAK7tj8PIzHf
+bgbR3K5SyjknDKG/g+MaMyjS/xu0wkuov4GGn3L6tjMMItySHVuX4rAsKI5MsDN4
+0jaRsOt+OT2RBtcMN6+DF77JWHLcMckaG8C1+BazJ4og83kY7aXjcWIad3XNqqO3
++Sl4Yqngrg6FBjREC4VyM98=
+-----END PRIVATE KEY-----`,
+      client_email: "googledriveuploader@voicerecorder-456703.iam.gserviceaccount.com"
+    };
 
-    const recordButton = document.getElementById('recordButton');
-    const stopButton = document.getElementById('stopButton');
-    const status = document.getElementById('status');
-    const emailInput = document.getElementById('email');
-    meterFill = document.getElementById('meter-fill');
-
-    window.addEventListener('load', () => {
-      const savedEmail = localStorage.getItem('userEmail');
-      if (savedEmail) {
-        emailInput.value = savedEmail;
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileInput');
+      if (!fileInput.files.length) {
+        alert("Please select a file first.");
+        return;
       }
-    });
 
-    recordButton.addEventListener('click', async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = async function (e) {
+        const fileData = new Uint8Array(e.target.result);
 
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioContext.createAnalyser();
-      microphone = audioContext.createMediaStreamSource(stream);
-      microphone.connect(analyser);
-      analyser.fftSize = 256;
-
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
-
-      mediaRecorder.ondataavailable = event => {
-        audioChunks.push(event.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        stopButton.disabled = true;
-        recordButton.disabled = false;
-        cancelAnimationFrame(animationId);
-        audioContext.close();
-        status.textContent = "Recording stopped. Uploading...";
-
-        const email = emailInput.value;
-        if (!email) {
-          alert("Please enter an email address!");
-          return;
-        }
-
-        localStorage.setItem('userEmail', email);
-
-        const blob = new Blob(audioChunks, { type: 'audio/wav' });
-
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64Audio = reader.result.split(',')[1];
-
-          await fetch('https://script.google.com/macros/s/AKfycbx-FKCr3ScS-kKQ8nIuIVRvR-mGe_5Cp7pvBNMTyOOD6iD8_jIbsw6Ho1j8Dp3UNIVq/exec?email=' + encodeURIComponent(email), {
+        try {
+          const jwt = createJWT();
+          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `file=${encodeURIComponent(base64Audio)}&email=${encodeURIComponent(email)}`
-          })
-          .then(response => response.text())
-          .then(text => {
-            console.log("Server response:", text);
-            status.textContent = "Upload complete!";
-          })
-          .catch(error => {
-            console.error("Upload error:", error);
-            status.textContent = "Upload failed.";
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
           });
-        };
 
-        reader.readAsDataURL(blob);
-      };
+          const tokenJson = await tokenResponse.json();
+          const accessToken = tokenJson.access_token;
 
-      mediaRecorder.start();
-      recordButton.disabled = true;
-      stopButton.disabled = false;
-      status.textContent = "Recording...";
+          const metadata = {
+            name: file.name,
+            parents: ['1tvoQALyZeQ1Db_QwPHysY0x5xQQDSOAM']
+          };
 
-      animateMeter();
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+          form.append('file', new Blob([fileData]));
 
-      // Auto-stop after 30 seconds
-      setTimeout(() => {
-        if (mediaRecorder && mediaRecorder.state === "recording") {
-          mediaRecorder.stop();
+          const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + accessToken },
+            body: form
+          });
+
+          const uploadJson = await uploadResponse.json();
+          document.getElementById('output').innerText = JSON.stringify(uploadJson, null, 2);
+        } catch (error) {
+          console.error(error);
+          document.getElementById('output').innerText = 'Upload failed: ' + error;
         }
-      }, 30000);
-    });
-
-    stopButton.addEventListener('click', () => {
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-      }
-    });
-
-    function animateMeter() {
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const draw = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
-        let percent = Math.min(100, (volume / 255) * 100);
-        meterFill.style.width = percent + "%";
-        animationId = requestAnimationFrame(draw);
       };
-      draw();
+      reader.readAsArrayBuffer(file);
+    }
+
+    function createJWT() {
+      const header = { alg: 'RS256', typ: 'JWT' };
+      const now = Math.floor(Date.now() / 1000);
+      const claim = {
+        iss: SERVICE_ACCOUNT.client_email,
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        aud: 'https://oauth2.googleapis.com/token',
+        exp: now + 3600,
+        iat: now
+      };
+
+      const sHeader = JSON.stringify(header);
+      const sClaim = JSON.stringify(claim);
+      const key = KEYUTIL.getKey(SERVICE_ACCOUNT.private_key);
+      return KJUR.jws.JWS.sign("RS256", sHeader, sClaim, key);
     }
   </script>
-
 </body>
 </html>
