@@ -9,7 +9,8 @@
     #meter-fill { height: 100%; width: 0%; background-color: #4caf50; transition: width 0.1s; }
     button { margin: 10px; padding: 10px 20px; font-size: 16px; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/jsrsasign"></script>
+  <!-- Correct browser-friendly jsrsasign version -->
+  <script src="https://cdn.jsdelivr.net/npm/jsrsasign@10.8.6/es6/jsrsasign-all-min.js"></script>
 </head>
 <body>
   <h1>Tudo Voice Uploader</h1>
@@ -39,7 +40,7 @@
     const stopButton = document.getElementById('stopButton');
     const status = document.getElementById('status');
 
-    const FOLDER_ID = '1tvoQALyZeQ1Db_QwPHysY0x5xQQDSOAM'; // Your Tudo folder ID
+    const FOLDER_ID = '1tvoQALyZeQ1Db_QwPHysY0x5xQQDSOAM'; // Your Tudo Drive Folder ID
 
     const SERVICE_ACCOUNT = {
       private_key: `-----BEGIN PRIVATE KEY-----
@@ -128,7 +129,7 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDqbsrqkrWbYs7B
 
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', blob, "voice_note.wav");  // <<< KEY CHANGE: name it explicitly!
+        form.append('file', blob, "voice_note.wav");  // KEY: use real blob, give a filename
 
         const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
           method: 'POST',
