@@ -5,7 +5,7 @@ const path = require('path');
 
 const app = express();
 
-// Your secret token (replace 'your_secret_here' later with your Render env var)
+// Your secret token (replace 'your_secret_here' with your Render env var if needed)
 const AUTH_TOKEN = process.env.AUTH_TOKEN || 'your_secret_here';
 
 // Create uploads folder if it doesn't exist
@@ -56,6 +56,25 @@ app.use('/uploads', (req, res, next) => {
   }
 
   express.static('uploads')(req, res, next);
+});
+
+// New: Secure delete endpoint for unwanted files
+app.delete('/uploads/:filename', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || authHeader !== `Bearer ${AUTH_TOKEN}`) {
+    console.warn('🚫 Unauthorized attempt to delete uploads!');
+    return res.status(403).send('Forbidden');
+  }
+
+  const filepath = path.join('uploads', req.params.filename);
+  fs.unlink(filepath, (err) => {
+    if (err) {
+      console.error('❌ Error deleting file:', err);
+      return res.status(500).send('Server error deleting file.');
+    }
+    console.log(`✅ Deleted file: ${req.params.filename}`);
+    res.status(200).send('✅ File deleted');
+  });
 });
 
 // Serve static frontend from "public" folder
